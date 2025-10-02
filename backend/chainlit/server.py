@@ -1,7 +1,7 @@
 import asyncio
 import fnmatch
 import glob
-import json
+import chainlit.json_compat as json
 import mimetypes
 import os
 import re
@@ -26,7 +26,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, ORJSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from starlette.datastructures import URL
 from starlette.middleware.cors import CORSMiddleware
@@ -76,12 +76,11 @@ from chainlit.types import (
 )
 from chainlit.user import PersistedUser, User
 from chainlit.utils import utc_now
-
+import logging
 from ._utils import is_path_inside
 
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -219,7 +218,7 @@ copilot_build_dir = get_build_dir(os.path.join("libs", "copilot"), "copilot")
 
 app = FastAPI(lifespan=lifespan)
 
-sio = socketio.AsyncServer(cors_allowed_origins=[], async_mode="asgi")
+sio = socketio.AsyncServer(cors_allowed_origins=[], async_mode="asgi", json=json)
 
 asgi_app = socketio.ASGIApp(socketio_server=sio, socketio_path="")
 
@@ -480,7 +479,7 @@ def _get_auth_response(access_token: str, redirect_to_callback: bool) -> Respons
             status_code=302,
         )
 
-    return JSONResponse(response_dict)
+    return ORJSONResponse(response_dict)
 
 
 def _get_oauth_redirect_error(request: Request, error: str) -> Response:
@@ -784,7 +783,7 @@ async def project_translations(
     # Load translation based on the provided language
     translation = config.load_translation(language)
 
-    return JSONResponse(
+    return ORJSONResponse(
         content={
             "translation": translation,
         }
@@ -835,7 +834,7 @@ async def project_settings(
         if current_profile and getattr(current_profile, "config_overrides", None):
             cfg = config.with_overrides(current_profile.config_overrides)
 
-    return JSONResponse(
+    return ORJSONResponse(
         content={
             "ui": cfg.ui.model_dump(),
             "features": cfg.features.model_dump(),
@@ -887,7 +886,7 @@ async def update_feedback(
     except Exception as e:
         raise HTTPException(detail=str(e), status_code=500) from e
 
-    return JSONResponse(content={"success": True, "feedbackId": feedback_id})
+    return ORJSONResponse(content={"success": True, "feedbackId": feedback_id})
 
 
 @router.delete("/feedback")
@@ -906,7 +905,7 @@ async def delete_feedback(
     feedback_id = payload.feedbackId
 
     await data_layer.delete_feedback(feedback_id)
-    return JSONResponse(content={"success": True})
+    return ORJSONResponse(content={"success": True})
 
 
 @router.post("/project/threads")
@@ -934,7 +933,7 @@ async def get_user_threads(
         payload.filter.userId = current_user.id
 
     res = await data_layer.list_threads(payload.pagination, payload.filter)
-    return JSONResponse(content=res.to_dict())
+    return ORJSONResponse(content=res.to_dict())
 
 
 @router.get("/project/thread/{thread_id}")
@@ -955,7 +954,7 @@ async def get_thread(
     await is_thread_author(current_user.identifier, thread_id)
 
     res = await data_layer.get_thread(thread_id)
-    return JSONResponse(content=res)
+    return ORJSONResponse(content=res)
 
 
 @router.get("/project/share/{thread_id}")
@@ -1009,7 +1008,7 @@ async def get_shared_thread(
     metadata.pop("chat_settings", None)
     metadata.pop("env", None)
     thread["metadata"] = metadata
-    return JSONResponse(content=thread)
+    return ORJSONResponse(content=thread)
 
 
 @router.get("/project/thread/{thread_id}/element/{element_id}")
@@ -1031,7 +1030,7 @@ async def get_thread_element(
     await is_thread_author(current_user.identifier, thread_id)
 
     res = await data_layer.get_element(thread_id, element_id)
-    return JSONResponse(content=res)
+    return ORJSONResponse(content=res)
 
 
 @router.put("/project/element")
@@ -1137,7 +1136,7 @@ async def rename_thread(
 
     await data_layer.update_thread(thread_id, name=payload.name)
 
-    return JSONResponse(content={"success": True})
+    return ORJSONResponse(content={"success": True})
 
 
 @router.put("/project/thread/share")
@@ -1189,7 +1188,7 @@ async def share_thread(
         logger.exception("[share_thread] update_thread failed: %s", e)
         raise
 
-    return JSONResponse(content={"success": True})
+    return ORJSONResponse(content={"success": True})
 
 
 @router.delete("/project/thread")
@@ -1213,7 +1212,7 @@ async def delete_thread(
     await is_thread_author(current_user.identifier, thread_id)
 
     await data_layer.delete_thread(thread_id)
-    return JSONResponse(content={"success": True})
+    return ORJSONResponse(content={"success": True})
 
 
 @router.post("/project/action")
@@ -1256,7 +1255,7 @@ async def call_action(
             detail=f"No callback found for action {action.name}",
         )
 
-    return JSONResponse(content={"success": True, "response": response})
+    return ORJSONResponse(content={"success": True, "response": response})
 
 
 @router.post("/mcp")
@@ -1405,7 +1404,7 @@ async def connect_mcp(
 
     tool_list = await mcp_session.list_tools()
 
-    return JSONResponse(
+    return ORJSONResponse(
         content={
             "success": True,
             "mcp": {
@@ -1466,7 +1465,7 @@ async def disconnect_mcp(
                 detail=f"Could not disconnect to the MCP: {e!s}",
             )
 
-    return JSONResponse(content={"success": True})
+    return ORJSONResponse(content={"success": True})
 
 
 @router.post("/project/file")
@@ -1510,16 +1509,7 @@ async def upload_file(
                 detail="Parent message not found",
             )
 
-        try:
-            validate_file_upload(file, spec=spec)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        file_response = await session.persist_file(
-            name=file.filename, content=content, mime=file.content_type
-        )
-
-        return JSONResponse(content=file_response)
+        422
     finally:
         await file.close()
 

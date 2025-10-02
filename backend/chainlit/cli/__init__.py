@@ -4,6 +4,8 @@ import os
 import click
 import nest_asyncio
 import uvicorn
+from granian import Granian
+from granian.server.embed import Server as GranianServer
 
 # Not sure if it is necessary to call nest_asyncio.apply() before the other imports
 nest_asyncio.apply()
@@ -70,6 +72,7 @@ def run_chainlit(target: str):
     config.run.root_path = root_path
 
     from chainlit.server import app
+    # from chainlit.server_starlette import app
 
     check_file(target)
     # Load the module provided by the user
@@ -101,9 +104,22 @@ def run_chainlit(target: str):
         )
         server = uvicorn.Server(config)
         await server.serve()
+        
+    async def start_granian():
+        server = GranianServer(
+                app,
+                address=host,
+                port=port,
+                interface="asgi",
+                websockets=True,
+                runtime_threads=10,   # số thread trong 1 worker
+                ssl_cert=ssl_certfile,
+                ssl_key=ssl_keyfile
+            )
+        await server.serve()
 
     # Run the asyncio event loop instead of uvloop to enable re entrance
-    asyncio.run(start())
+    asyncio.run(start_granian())
     # uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 
