@@ -737,12 +737,30 @@ class SQLAlchemyDataLayer(BaseDataLayer):
             for element in elements:
                 thread_id = element["element_threadid"]
                 if thread_id is not None:
+                    element_url: str | None = None
+                    object_key_val = element.get("element_objectkey")
+                    if (
+                        self.storage_provider is not None
+                        and isinstance(object_key_val, str)
+                        and object_key_val.strip()
+                    ):
+                        try:
+                            element_url = await self.storage_provider.get_read_url(
+                                object_key=object_key_val,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to get read URL for object_key '{object_key_val}': {e}. Falling back to stored URL."
+                            )
+                            element_url = element.get("element_url")
+                    else:
+                        element_url = element.get("element_url")
                     element_dict = ElementDict(
                         id=element["element_id"],
                         threadId=thread_id,
                         type=element["element_type"],
                         chainlitKey=element.get("element_chainlitkey"),
-                        url=element.get("element_url"),
+                        url=element_url,
                         objectKey=element.get("element_objectkey"),
                         name=element["element_name"],
                         display=element["element_display"],
@@ -758,3 +776,8 @@ class SQLAlchemyDataLayer(BaseDataLayer):
                     thread_dicts[thread_id]["elements"].append(element_dict)  # type: ignore
 
         return list(thread_dicts.values())
+
+    async def close(self) -> None:
+        if self.storage_provider:
+            await self.storage_provider.close()
+        await self.engine.dispose()
