@@ -1512,7 +1512,16 @@ async def upload_file(
                 detail="Parent message not found",
             )
 
-        422
+        try:
+            validate_file_upload(file, spec=spec)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        file_response = await session.persist_file(
+            name=file.filename, content=content, mime=file.content_type
+        )
+
+        return ORJSONResponse(content=file_response)
     finally:
         await file.close()
 

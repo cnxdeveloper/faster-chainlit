@@ -1,5 +1,6 @@
 import asyncio
-import json
+# import json
+import chainlit.json_compat as json
 import mimetypes
 import re
 import shutil

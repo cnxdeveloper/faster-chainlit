@@ -120,6 +120,7 @@ def run_chainlit(target: str):
 
     # Run the asyncio event loop instead of uvloop to enable re entrance
     asyncio.run(start_granian())
+    # asyncio.run(start())
     # uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 

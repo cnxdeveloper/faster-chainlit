@@ -1,6 +1,30 @@
 import orjson
 from typing import Any
 
+
+class JSONEncoder:
+    def __init__(self, *, default=None, option=0):
+        """
+        Wrapper giống json.JSONEncoder nhưng dùng orjson.
+        
+        :param default: hàm xử lý object không serialize được
+        :param option: orjson option flags (ví dụ orjson.OPT_INDENT_2)
+        """
+        self.default = default
+        self.option = option
+
+    def encode(self, obj):
+        return orjson.dumps(obj, default=self.default, option=self.option).decode()
+
+    def iterencode(self, obj):
+        # giữ API giống json.JSONEncoder
+        yield self.encode(obj)
+
+    # để gọi trực tiếp như json.JSONEncoder().encode(obj)
+    def __call__(self, obj):
+        return self.encode(obj)
+
+
 def dumps(obj: Any, *, skipkeys=False, ensure_ascii=False,
           check_circular=True, allow_nan=True, cls=None,
           indent=None, separators=None, default=None,
