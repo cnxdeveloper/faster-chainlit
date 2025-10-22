@@ -1,6 +1,4 @@
 import asyncio
-# import json
-import chainlit.json_compat as json
 import mimetypes
 import re
 import shutil
@@ -10,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable, Deque, Dict, Literal, Optional,
 
 import aiofiles
 
+# import json
+import chainlit.json_compat as json
 from chainlit.logger import logger
 from chainlit.types import AskFileSpec, FileReference
 

@@ -1,7 +1,6 @@
 import asyncio
 import fnmatch
 import glob
-import chainlit.json_compat as json
 import mimetypes
 import os
 import re
@@ -26,7 +25,12 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, ORJSONResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    ORJSONResponse,
+    RedirectResponse,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from starlette.datastructures import URL
 from starlette.middleware.cors import CORSMiddleware
@@ -34,6 +38,7 @@ from starlette.types import Receive, Scope, Send
 from typing_extensions import Annotated
 from watchfiles import awatch
 
+import chainlit.json_compat as json
 from chainlit.auth import create_jwt, decode_jwt, get_configuration, get_current_user
 from chainlit.auth.cookie import (
     clear_auth_cookie,
@@ -76,11 +81,12 @@ from chainlit.types import (
 )
 from chainlit.user import PersistedUser, User
 from chainlit.utils import utc_now
-import logging
+
 from ._utils import is_path_inside
 
 mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
