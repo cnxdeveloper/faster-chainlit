@@ -4,7 +4,6 @@ import os
 import click
 import nest_asyncio
 import uvicorn
-from granian import Granian
 from granian.server.embed import Server as GranianServer
 
 # Not sure if it is necessary to call nest_asyncio.apply() before the other imports
@@ -66,6 +65,7 @@ def run_chainlit(target: str):
     ]  # Convert to boolean
 
     ws_protocol = os.environ.get("UVICORN_WS_PROTOCOL", "auto")
+    server_type = os.environ.get("SERVER_TYPE", "granian")
 
     config.run.host = host
     config.run.port = port
@@ -104,23 +104,25 @@ def run_chainlit(target: str):
         )
         server = uvicorn.Server(config)
         await server.serve()
-        
+
     async def start_granian():
         server = GranianServer(
-                app,
-                address=host,
-                port=port,
-                interface="asgi",
-                websockets=True,
-                runtime_threads=10,   # số thread trong 1 worker
-                ssl_cert=ssl_certfile,
-                ssl_key=ssl_keyfile
-            )
+            app,
+            address=host,
+            port=port,
+            interface="asgi",
+            websockets=True,
+            runtime_threads=10,  # số thread trong 1 worker
+            ssl_cert=ssl_certfile,
+            ssl_key=ssl_keyfile,
+        )
         await server.serve()
 
     # Run the asyncio event loop instead of uvloop to enable re entrance
-    asyncio.run(start_granian())
-    # asyncio.run(start())
+    if server_type == "granian":
+        asyncio.run(start_granian())
+    else:
+        asyncio.run(start())
     # uvicorn.run(app, host=host, port=port, log_level=log_level)
 
 
@@ -181,6 +183,14 @@ def run_chainlit(target: str):
 @click.option("--host", help="Specify a different host to run the server on")
 @click.option("--port", help="Specify a different port to run the server on")
 @click.option("--root-path", help="Specify a different root path to run the server on")
+@click.option(
+    "--server-type",
+    default="granian",
+    envvar="SERVER_TYPE",
+    type=click.Choice(["granian", "uvicorn"], case_sensitive=False),
+    show_default=True,
+    help="Specify a server type granian or uvicorn",
+)
 def chainlit_run(
     target,
     watch,
@@ -193,6 +203,7 @@ def chainlit_run(
     host,
     port,
     root_path,
+    server_type,
 ):
     if host:
         os.environ["CHAINLIT_HOST"] = host
@@ -213,6 +224,8 @@ def chainlit_run(
         no_cache = True
         # This is required to have OpenAI LLM providers available for the CI run
         os.environ["OPENAI_API_KEY"] = "sk-FAKE-OPENAI-API-KEY"
+    if server_type:
+        os.environ["SERVER_TYPE"] = server_type
 
     config.run.headless = headless
     config.run.debug = debug
